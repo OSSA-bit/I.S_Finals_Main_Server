@@ -68,7 +68,8 @@ const esc = (value) =>
 const panels = Object.entries(SERVICES)
     .map(([id, svc]) => `
         <div class="view-panel" id="panel-${esc(id)}" data-service="${esc(id)}">
-            <iframe title="${esc(svc.label)}" data-src="${esc(svc.url)}"></iframe>
+            <!-- ADDED: allow="camera; microphone" -->
+            <iframe title="${esc(svc.label)}" data-src="${esc(svc.url)}" allow="camera; microphone; clipboard-write"></iframe>
             <div class="offline-overlay">
                 <h2>${esc(svc.label)} is unreachable</h2>
                 <p>Could not connect to <code>${esc(svc.url)}</code>.</p>
