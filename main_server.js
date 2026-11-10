@@ -8,9 +8,14 @@ app.disable('x-powered-by');
 // Configuration: override via environment variables if endpoints differ
 const SERVICES = {
     recyclifi: {
-        label: 'RecycliFi',
+        label: 'RecycliFi (Edge)',
         url: process.env.RECYCLIFI_URL || 'https://i-s-finals.onrender.com/',
         healthPath: '/api/status',
+    },
+    recyclifi_ai: {
+        label: 'RecycliFi (AI)',
+        url: process.env.RECYCLIFI_AI_URL || 'https://ashtray42-recyclifi-ai.hf.space', // Update when you deploy the new AI version
+        healthPath: '/',
     },
     nutrition: {
         label: 'Nutrition',
@@ -26,7 +31,6 @@ const SERVICES = {
 
 const PROBE_TIMEOUT_MS = 60000;
 
-// Server-side probe: no CORS, real status codes, hard timeout.
 async function probe(baseUrl, path, timeoutMs = PROBE_TIMEOUT_MS) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -36,7 +40,6 @@ async function probe(baseUrl, path, timeoutMs = PROBE_TIMEOUT_MS) {
             redirect: 'manual',
             headers: { 'user-agent': 'control-hub-healthcheck' },
         });
-        // Drain/cancel the body so sockets aren't held open.
         if (res.body) res.body.cancel().catch(() => {});
         return { online: true, status: res.status };
     } catch (err) {
@@ -59,7 +62,6 @@ app.get('/api/health', async (_req, res) => {
     res.set('cache-control', 'no-store').json(Object.fromEntries(entries));
 });
 
-// Minimal HTML escaping for values injected into the page.
 const esc = (value) =>
     String(value).replace(/[&<>"']/g, (c) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -68,7 +70,6 @@ const esc = (value) =>
 const panels = Object.entries(SERVICES)
     .map(([id, svc]) => `
         <div class="view-panel" id="panel-${esc(id)}" data-service="${esc(id)}">
-            <!-- ADDED: allow="camera; microphone" -->
             <iframe title="${esc(svc.label)}" data-src="${esc(svc.url)}" allow="camera; microphone; clipboard-write"></iframe>
             <div class="offline-overlay">
                 <h2>${esc(svc.label)} is unreachable</h2>
@@ -100,58 +101,28 @@ app.get('/', (req, res) => {
             --accent-emerald: #10b981;
             --accent-purple: #a855f7;
             --accent-amber: #f59e0b;
+            --accent-cyan: #06b6d4;
         }
 
-        * { 
-            box-sizing: border-box; 
-            margin: 0; 
-            padding: 0; 
-            -webkit-tap-highlight-color: transparent; 
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
         body, html {
-            width: 100%;
-            height: 100vh;
-            height: 100dvh;
-            background-color: var(--bg-main);
-            color: var(--text-primary);
-            overflow: hidden;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            width: 100%; height: 100vh; height: 100dvh;
+            background-color: var(--bg-main); color: var(--text-primary);
+            overflow: hidden; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             -webkit-text-size-adjust: 100%;
         }
 
-        /* ---- Viewport / panels ---- */
         .viewport-container { position: relative; width: 100%; height: 100%; }
-
-        .view-panel {
-            position: absolute;
-            inset: 0;
-            display: none;
-            background-color: var(--bg-main);
-        }
+        .view-panel { position: absolute; inset: 0; display: none; background-color: var(--bg-main); }
         .view-panel.active { display: block; }
-
-        .view-panel iframe {
-            width: 100%;
-            height: 100%;
-            border: 0;
-            display: block;
-            background: var(--bg-main);
-        }
-
+        .view-panel iframe { width: 100%; height: 100%; border: 0; display: block; background: var(--bg-main); }
         .view-panel.offline iframe { visibility: hidden; }
 
         .offline-overlay {
-            position: absolute;
-            inset: 0;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-            padding: 2rem;
-            text-align: center;
-            background: var(--bg-main);
+            position: absolute; inset: 0; display: none; flex-direction: column;
+            align-items: center; justify-content: center; gap: 0.75rem;
+            padding: 2rem; text-align: center; background: var(--bg-main);
         }
         .view-panel.offline .offline-overlay { display: flex; }
         .offline-overlay h2 { font-size: 1.15rem; font-weight: 600; }
@@ -159,26 +130,15 @@ app.get('/', (req, res) => {
         .offline-overlay code { font-size: 0.85rem; color: var(--text-muted); }
 
         .retry-btn {
-            margin-top: 0.5rem;
-            padding: 0.55rem 1.25rem;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            background: var(--bg-card);
-            color: var(--text-primary);
-            font: inherit;
-            font-weight: 600;
-            cursor: pointer;
-            min-height: 44px;
-            touch-action: manipulation;
+            margin-top: 0.5rem; padding: 0.55rem 1.25rem; border-radius: 8px;
+            border: 1px solid var(--border-color); background: var(--bg-card);
+            color: var(--text-primary); font: inherit; font-weight: 600;
+            cursor: pointer; min-height: 44px; touch-action: manipulation;
         }
         .retry-btn:hover { border-color: var(--accent-blue); }
-        .retry-btn:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 
-        /* ---- Homepage ---- */
         #home-view { 
-            padding: 3rem 2rem 7rem 2rem; 
-            overflow-y: auto; 
-            height: 100%;
+            padding: 3rem 2rem 7rem 2rem; overflow-y: auto; height: 100%;
             -webkit-overflow-scrolling: touch;
             padding-left: max(2rem, env(safe-area-inset-left));
             padding-right: max(2rem, env(safe-area-inset-right));
@@ -195,61 +155,28 @@ app.get('/', (req, res) => {
         }
 
         .card {
-            background-color: var(--bg-card);
-            color: inherit;
-            font: inherit;
-            text-align: left;
-            width: 100%;
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
-            cursor: pointer;
-            transition: transform 0.2s ease, border-color 0.2s ease;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            min-width: 0;
+            background-color: var(--bg-card); color: inherit; font: inherit; text-align: left;
+            width: 100%; border: 1px solid var(--border-color); border-radius: 12px;
+            padding: 1.5rem; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease;
+            display: flex; flex-direction: column; justify-content: space-between; min-width: 0;
         }
         .card:hover { transform: translateY(-2px); border-color: var(--accent-blue); }
         .card:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 3px; }
 
-        .card-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 1rem;
-            gap: 1rem;
-        }
-
+        .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; gap: 1rem; }
         .card-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.05);
-            flex-shrink: 0;
+            width: 40px; height: 40px; border-radius: 8px; display: flex;
+            align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.05); flex-shrink: 0;
         }
         .card-icon svg { width: 22px; height: 22px; }
 
         .status-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.25rem 0.65rem;
-            border-radius: 9999px;
-            background: rgba(100, 116, 139, 0.15);
-            color: var(--text-muted);
-            white-space: nowrap;
-            flex-shrink: 0;
+            display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.75rem;
+            font-weight: 600; padding: 0.25rem 0.65rem; border-radius: 9999px;
+            background: rgba(100, 116, 139, 0.15); color: var(--text-muted);
+            white-space: nowrap; flex-shrink: 0;
         }
-        .status-indicator.online {
-            background: rgba(16, 185, 129, 0.12);
-            color: var(--accent-emerald);
-        }
+        .status-indicator.online { background: rgba(16, 185, 129, 0.12); color: var(--accent-emerald); }
         .status-dot { width: 6px; height: 6px; border-radius: 50%; background-color: currentColor; }
 
         .card-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 0.35rem; }
@@ -258,58 +185,33 @@ app.get('/', (req, res) => {
 
         /* ---- Floating dock ---- */
         .floating-dock-wrapper {
-            position: fixed;
-            bottom: max(1.5rem, env(safe-area-inset-bottom));
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 9999;
-            width: max-content;
-            max-width: 100%;
-            padding: 0 1rem;
+            position: fixed; bottom: max(1.5rem, env(safe-area-inset-bottom));
+            left: 50%; transform: translateX(-50%); z-index: 9999;
+            width: max-content; max-width: 100%; padding: 0 1rem;
         }
 
         .floating-dock {
-            background: rgba(21, 28, 44, 0.85);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 0.5rem;
-            border-radius: 9999px;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-            width: 100%;
-            justify-content: center;
+            background: rgba(21, 28, 44, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1); padding: 0.5rem;
+            border-radius: 9999px; display: flex; align-items: center; gap: 0.5rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); width: 100%; justify-content: center;
         }
 
         .dock-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            padding: 0.6rem 1.1rem;
-            border-radius: 9999px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            font-family: inherit;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: all 0.2s ease;
-            white-space: nowrap;
-            touch-action: manipulation;
-            min-height: 44px;
+            background: transparent; border: none; color: var(--text-secondary);
+            padding: 0.6rem 1rem; border-radius: 9999px; font-size: 0.85rem;
+            font-weight: 500; font-family: inherit; cursor: pointer; display: flex;
+            align-items: center; gap: 0.5rem; transition: all 0.2s ease;
+            white-space: nowrap; touch-action: manipulation; min-height: 44px;
         }
         .dock-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
         .dock-btn:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.05); }
-        .dock-btn:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
         .dock-btn.active { background: var(--accent-blue); color: #000000; font-weight: 600; }
 
         .dock-divider { width: 1px; height: 20px; background-color: var(--border-color); flex-shrink: 0; }
 
         /* ---- Responsive Adjustments ---- */
-        @media (max-width: 640px) {
+        @media (max-width: 768px) {
             #home-view { 
                 padding: 1.5rem 1rem 7rem 1rem; 
                 padding-left: max(1rem, env(safe-area-inset-left));
@@ -321,31 +223,13 @@ app.get('/', (req, res) => {
             .grid-cards { gap: 1rem; }
             .card { padding: 1.25rem; }
             
-            .floating-dock-wrapper {
-                left: 0;
-                right: 0;
-                transform: none;
-                width: 100%;
-                max-width: 100%;
-                padding: 0 0.5rem;
-            }
-            .floating-dock {
-                justify-content: space-between;
-                gap: 0.25rem;
-                padding: 0.4rem;
-            }
-            .dock-btn {
-                flex: 1;
-                justify-content: center;
-                padding: 0.6rem 0.5rem;
-                font-size: 0.75rem;
-                gap: 0.35rem;
-            }
-            .dock-btn svg { width: 16px; height: 16px; }
+            .floating-dock-wrapper { left: 0; right: 0; transform: none; width: 100%; max-width: 100%; padding: 0 0.5rem; }
+            .floating-dock { justify-content: space-between; gap: 0.25rem; padding: 0.4rem; }
+            .dock-btn { flex: 1; justify-content: center; padding: 0.6rem 0.25rem; font-size: 0.75rem; gap: 0.25rem; }
             .dock-divider { display: none; }
         }
 
-        @media (max-width: 400px) {
+        @media (max-width: 500px) {
             .dock-btn span { display: none; }
             .dock-btn { padding: 0.6rem; min-height: 48px; }
             .card-top { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
@@ -363,6 +247,7 @@ app.get('/', (req, res) => {
                 </div>
 
                 <div class="grid-cards">
+                    <!-- RecycliFi Edge -->
                     <button class="card" type="button" data-tab="recyclifi">
                         <div>
                             <div class="card-top">
@@ -376,12 +261,32 @@ app.get('/', (req, res) => {
                                     <div class="status-dot"></div><span>Checking…</span>
                                 </div>
                             </div>
-                            <div class="card-title">RecycliFi Terminal</div>
-                            <div class="card-desc">Hardware telemetry, object detection scanner, and local network voucher authorization.</div>
+                            <div class="card-title">RecycliFi (Edge)</div>
+                            <div class="card-desc">Hardware telemetry, object detection scanner, and local network voucher authorization via ESP32.</div>
                         </div>
                         <div class="card-footer">Port: 3000</div>
                     </button>
 
+                    <!-- RecycliFi AI -->
+                    <button class="card" type="button" data-tab="recyclifi_ai">
+                        <div>
+                            <div class="card-top">
+                                <div class="card-icon" style="color: var(--accent-cyan);">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                    </svg>
+                                </div>
+                                <div class="status-indicator" id="status-recyclifi_ai">
+                                    <div class="status-dot"></div><span>Checking…</span>
+                                </div>
+                            </div>
+                            <div class="card-title">RecycliFi (AI)</div>
+                            <div class="card-desc">Cloud-based Vision-Language Model inference for high-accuracy material separation without local datasets.</div>
+                        </div>
+                        <div class="card-footer">Cloud API</div>
+                    </button>
+
+                    <!-- Nutrition -->
                     <button class="card" type="button" data-tab="nutrition">
                         <div>
                             <div class="card-top">
@@ -396,12 +301,13 @@ app.get('/', (req, res) => {
                                     <div class="status-dot"></div><span>Checking…</span>
                                 </div>
                             </div>
-                            <div class="card-title">Nutrition Vision Engine</div>
+                            <div class="card-title">Nutrition Vision</div>
                             <div class="card-desc">Vision language ingredient parsing and USDA nutritional database breakdown.</div>
                         </div>
-                        <div class="card-footer">Port: 7860 / Gradio</div>
+                        <div class="card-footer">Gradio VLM</div>
                     </button>
 
+                    <!-- Face ID -->
                     <button class="card" type="button" data-tab="faceid">
                         <div>
                             <div class="card-top">
@@ -415,10 +321,10 @@ app.get('/', (req, res) => {
                                     <div class="status-dot"></div><span>Checking…</span>
                                 </div>
                             </div>
-                            <div class="card-title">Biometric Face Matrix</div>
+                            <div class="card-title">Biometric Matrix</div>
                             <div class="card-desc">Real-time facial identification, feature alignment, and vector database registration.</div>
                         </div>
-                        <div class="card-footer">Port: 5000</div>
+                        <div class="card-footer">OpenCV / Flask</div>
                     </button>
                 </div>
             </div>
@@ -444,7 +350,14 @@ app.get('/', (req, res) => {
                     <polyline points="23 4 23 10 17 10"></polyline>
                     <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
                 </svg>
-                <span>RecycliFi</span>
+                <span>Edge</span>
+            </button>
+
+            <button class="dock-btn" type="button" id="btn-recyclifi_ai" data-tab="recyclifi_ai">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                <span>AI</span>
             </button>
 
             <button class="dock-btn" type="button" id="btn-nutrition" data-tab="nutrition">
@@ -452,14 +365,14 @@ app.get('/', (req, res) => {
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="3" y1="9" x2="21" y2="9"></line>
                 </svg>
-                <span>Nutrition</span>
+                <span>Food</span>
             </button>
 
             <button class="dock-btn" type="button" id="btn-faceid" data-tab="faceid">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M9 3H5a2 2 0 0 0-2 2v4m16-6h-4a2 2 0 0 1 2 2v4M3 15v4a2 2 0 0 0 2 2h4m12-6v4a2 2 0 0 1-2 2h-4"></path>
                 </svg>
-                <span>Face Matrix</span>
+                <span>Face</span>
             </button>
         </nav>
     </div>
@@ -488,7 +401,6 @@ app.get('/', (req, res) => {
             panel.classList.remove('offline');
 
             const frame = panel.querySelector('iframe');
-            // Lazily attach the source only once the panel is actually visible
             if (frame.dataset.loaded !== 'true') {
                 frame.src = frame.dataset.src;
                 frame.dataset.loaded = 'true';
