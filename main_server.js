@@ -14,7 +14,7 @@ const SERVICES = {
     },
     recyclifi_ai: {
         label: 'RecycliFi (AI)',
-        url: process.env.RECYCLIFI_AI_URL || 'https://ashtray42-recyclifi-ai.hf.space', // Update when you deploy the new AI version
+        url: process.env.RECYCLIFI_AI_URL || 'https://ashtray42-recycling-analyzerai.hf.space', 
         healthPath: '/',
     },
     nutrition: {
